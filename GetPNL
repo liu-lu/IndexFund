@@ -1,0 +1,95 @@
+%组合表现
+function [ pnl, long, short, longno, shortno, tover, risk ,Holding] = GetPNL(m, cfg ,di)
+
+% Holding = zeros(size(m.alpha) );
+% 
+% pnl = zeros(size(m.daylist));
+% long = pnl; short = pnl;
+% longno = pnl; shortno = pnl;
+% tover = pnl;
+% risk = nan( size(pnl,1), 30 );
+% HSWeight = nan(size(m.cps(),1 )-1,length(m.daylist));
+
+% for di = 3 : length(m.daylist)
+%% long & short
+    x = m.alpha(:,di);	x(isnan(x)) = 0;
+    
+    x0 = m.alpha1(:,di-1);   x0(isnan(x0)) = 0;
+    
+    longno= sum( x > 0 );
+    shortno= sum( x < 0 );
+    long= sum( x(x>0) );
+    short= sum( x(x<0) );
+    
+    s = m.hs300weights(:,di);
+    
+    s(isnan(s)) = 0;
+    s(s>0) = s(s>0) / sum(s(s>0))*long;
+    
+%% risk
+    
+    Holding(:,1) = x-s;
+    Holding(1,1) = 0;
+    %HS300 exposure
+    ActiveWeight = Holding(:,1);
+    tmp = m.hs300(:,di).*ActiveWeight;
+    risk(1,3) = sum(tmp(isfinite(tmp)))/cfg.scale;
+    
+    %betas
+    if isfield( m, 'betas' )
+        tmp = m.betas(:,di);
+        tmp( isnan(tmp) ) = 1;
+        x1 = x - s;x1(1) = 0;
+        tmp = tmp .* x1;
+        risk(1,1) = sum(tmp(isfinite(tmp))) / cfg.scale;
+    end
+    
+    % ind1
+    if isfield( m, 'ind1' )
+        tmp = m.ind1(:,di); 
+        x2 = x - s; x2(1) = 0;
+        for indi = min(tmp) : max(tmp)
+            x1 = x2( tmp == indi );
+            risk(1,3+indi) = sum( x1( isfinite(x1) ) ) / cfg.scale;
+        end
+        risk(1,2) = sum( abs( risk( 1, min(tmp)+3 : max(tmp)+3 ) ) );
+    end
+   
+    % pnl
+    r = m.cps(:,di)./m.ops(:,di); r( isnan(r) ) = 1;
+    r0 = m.ops(:,di)./m.cps(:,di-1);r0( isnan(r0) ) = 1; 
+    diff = abs( x - x0.* r0 ); 
+    diff(1) = 0;
+    tmp = x .* (r-1) + x0 .* (r0-1);    
+    tover= sum( diff(isfinite(diff)) ) ;
+    pnl = sum( tmp(isfinite(tmp)) ) - tover* cfg.fee/2;
+    
+% end
+
+%% output results
+% txt = sprintf( '%4s %22s %10s %10s %12s %10s %10s %10s %10s %8s %8s', ...
+%     'Year', 'longMshort', 'longSshort', 'Return%', 'Volatility%', 'InfoRatio', 'Tover_yr%', 'Tover_day%', ...
+%     'drawdown%', 'dd_s','dd_e' );
+% disp(txt)
+% 
+% yr = unique(year(m.daylist( longno > 0 )));
+% for yi = 1 : length(yr)
+%     bool = year(m.daylist) == yr(yi);
+%     dates = m.daylist(bool);
+%     r = pnl(bool) / cfg.scale;
+%     tover_y = sum(tover(bool)) / cfg.scale;
+%     tover_d = sum(tover(bool)) / cfg.scale / sum(bool);
+%     dd = Drawdown(r);
+%     ylong = mean(long(bool));
+%     yshort = mean(short(bool));
+%     ylongno = mean(longno(bool));
+%     yshortno = mean(shortno(bool));
+%     ls_money = [ num2str(round(ylong)) 'X' num2str(round(yshort)) ];
+%     ls_no = [ num2str(round(ylongno)) 'X' num2str(round(yshortno)) ];
+%     
+%     txt = sprintf( '%4d %22s %10s %10.2f %12.2f %10.2f %10.2f %10.2f %10.2f %8s %8s', ...
+%         yr(yi), ls_money, ls_no, sum(r)*100, std(r)*sqrt(250)*100, mean(r)/std(r)*sqrt(250), tover_y*100, tover_d*100, ...
+%         dd(1)*100, datestr(dates(dd(2)),'yyyymmdd'), datestr(dates(dd(3)),'yyyymmdd') );
+%     disp(txt)
+%     
+% end
