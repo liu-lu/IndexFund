@@ -1,0 +1,36 @@
+function m = LoadMatrix( startday,endday )
+%% 导入数据矩阵
+
+%% define names
+filepath = 'C:\Users\ZQC\Desktop\hs300\datamatrix\';
+structnames = { 'quotes'; 'adj'; 'returns'; 'betas'; 'swindustry'; 'hs300wei' };
+fld_quotes = { 'ops'; 'cps'; 'lps'; 'hps'; 'volume'; 'amount' };
+fld_adj = { 'adj' };
+fld_returns = { 'returns' };
+fld_betas = { 'betas' };
+fld_swindustry = { 'indname1'; 'ind1'; 'indname2'; 'ind2' };
+fld_hs300wei = { 'hs300weights' };
+
+%% load day & stock list
+filename = [ filepath 'universeall.mat' ];
+m = load(filename);
+startid = find( m.daylist >= startday, 1, 'first' );
+endid= find(m.daylist<=endday,1,'last');
+m.daylist = m.daylist( startid : endid );
+
+%% load matrix
+for stri = 1 : length( structnames )
+    filename = [ filepath structnames{stri} '.mat' ];
+    txt = 'x = load(filename';
+    eval( [ 'xnames = fld_' structnames{stri} ';' ] );
+    for ni = 1 : length(xnames); txt = [ txt ', xnames{' num2str(ni) '}' ]; end
+    txt = [ txt ');' ]; 
+    eval(txt);
+    for xni = 1 : length(xnames)
+        if size(x.(xnames{xni}),2) > 1
+            m.(xnames{xni}) = x.(xnames{xni})(:,startid:endid);
+        else
+            m.(xnames{xni}) = x.(xnames{xni});
+        end
+    end
+end
